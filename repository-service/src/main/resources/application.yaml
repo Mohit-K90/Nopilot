@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: repository-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/nopilot_repositories
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8082
+
+# Same Base64 secret as user-service. Supply it via the JWT_SECRET environment variable.
+jwt:
+  secret: ${JWT_SECRET}
+
+nopilot:
+  github:
+    base-url: https://api.github.com
+    raw-base-url: https://raw.githubusercontent.com
+    # Optional. Without a token GitHub allows only 60 API requests/hour per IP.
+    token: ${GITHUB_TOKEN:}
+    connect-timeout-seconds: 5
+    read-timeout-seconds: 20
+  ingestion:
+    max-files: 200
+    max-file-size-bytes: 102400
+    max-total-size-bytes: 5242880

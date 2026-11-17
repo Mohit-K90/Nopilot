@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: user-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/nopilot_users
+    username: postgres
+    password: YOUR_ACTUAL_PASSWORD
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8081
+
+jwt:
+  secret: dbCZJZxonYpJpq2IYMMeJrwEYggQryYNxqqtVL/upZ8=
+  expiration: 3600000
