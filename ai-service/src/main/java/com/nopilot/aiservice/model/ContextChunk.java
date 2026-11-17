@@ -1,0 +1,1 @@
+package com.nopilot.aiservice.model;  /** A chunk selected for the LLM prompt. "number" is the [n] the model cites. */ public record ContextChunk(         int number,         String filePath,         String language,         int startLine,         int endLine,         String symbol,         double score,         String text ) { }

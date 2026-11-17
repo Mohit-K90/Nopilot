@@ -1,0 +1,1 @@
+package com.nopilot.aiservice.model;  /** Token counts exactly as reported by the model. Any field is null when not reported. */ public record TokenUsage(Integer promptTokens, Integer completionTokens, Integer totalTokens) {      public static TokenUsage unavailable() {         return new TokenUsage(null, null, null);     } }
