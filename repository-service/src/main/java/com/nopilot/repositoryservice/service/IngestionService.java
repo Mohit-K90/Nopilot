@@ -163,7 +163,7 @@ public class IngestionService {
 
         for (TreeEntry entry : entries) {
             try {
-                byte[] bytes = gitHubClient.downloadFile(owner, repoName, branch, entry.path());
+                byte[] bytes = gitHubClient.downloadFile(owner, repoName, entry);
 
                 Optional<String> text = decodeText(bytes);
 

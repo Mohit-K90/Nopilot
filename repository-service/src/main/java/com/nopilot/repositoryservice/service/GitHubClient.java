@@ -22,6 +22,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -32,9 +33,8 @@ import java.util.function.Supplier;
  * Talks to GitHub. Read-only: it only issues GET requests, so it can never
  * modify the repository it reads.
  *
- * - Metadata and the file tree come from the REST API (api.github.com).
- * - File contents come from raw.githubusercontent.com, which (unlike the API)
- *   does not eat into the 60 requests/hour unauthenticated API limit.
+ * - Metadata, the file tree, and file blobs come from the REST API (api.github.com).
+ * - File contents are fetched by Git blob SHA, avoiding raw.githubusercontent.com.
  *
  * All HTTP/network failures are translated into our own exceptions so that
  * callers never see Spring's RestClient exceptions.
@@ -46,13 +46,10 @@ public class GitHubClient {
     private static final Set<String> REGULAR_FILE_MODES = Set.of("100644", "100755");
 
     private final RestClient apiClient;
-    private final RestClient rawClient;
-    private final String rawBaseUrl;
     private final long maxFileSizeBytes;
 
     public GitHubClient(
             @Value("${nopilot.github.base-url}") String apiBaseUrl,
-            @Value("${nopilot.github.raw-base-url}") String rawBaseUrl,
             @Value("${nopilot.github.token:}") String token,
             @Value("${nopilot.github.connect-timeout-seconds:5}") int connectTimeoutSeconds,
             @Value("${nopilot.github.read-timeout-seconds:20}") int readTimeoutSeconds,
@@ -67,8 +64,6 @@ public class GitHubClient {
                 .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
                 .build();
 
-        this.rawClient = baseBuilder(requestFactory, token).build();
-        this.rawBaseUrl = rawBaseUrl;
         this.maxFileSizeBytes = ingestionProperties.getMaxFileSizeBytes();
     }
 
@@ -126,7 +121,8 @@ public class GitHubClient {
             if (isRegularFile(node)) {
                 entries.add(new TreeEntry(
                         node.path("path").asText(),
-                        node.path("size").asLong(0L)
+                        node.path("size").asLong(0L),
+                        node.path("sha").asText()
                 ));
             }
         }
@@ -137,45 +133,67 @@ public class GitHubClient {
     }
 
     /**
-     * Downloads one file's raw bytes.
+     * Downloads a file using the Git Blobs API and the SHA returned by the
+     * recursive tree endpoint. This avoids raw.githubusercontent.com entirely.
      *
      * @throws FileDownloadException      this one file failed (caller may skip it)
      * @throws GitHubRateLimitException   limit reached (caller should stop entirely)
      */
-    public byte[] downloadFile(String owner, String repoName, String branch, String path) {
+    public byte[] downloadFile(String owner, String repoName, TreeEntry entry) {
 
-        URI uri = UriComponentsBuilder.fromUriString(rawBaseUrl)
-                .pathSegment(owner, repoName, branch)
-                .pathSegment(path.split("/"))
-                .build()
-                .encode()
-                .toUri();
+        if (entry.sha() == null || entry.sha().isBlank()) {
+            throw new FileDownloadException(
+                    "GitHub did not provide a blob SHA for '" + entry.path() + "'");
+        }
 
-        byte[] body;
+        JsonNode blob;
 
         try {
-            body = rawClient.get().uri(uri).retrieve().body(byte[].class);
+            blob = apiClient.get()
+                    .uri("/repos/{owner}/{repo}/git/blobs/{sha}",
+                            owner, repoName, entry.sha())
+                    .retrieve()
+                    .body(JsonNode.class);
 
         } catch (RestClientResponseException exception) {
             if (isRateLimited(exception)) {
                 throw rateLimitException(exception);
             }
             throw new FileDownloadException(
-                    "Failed to download '" + path + "' (HTTP "
+                    "Failed to download '" + entry.path() + "' (GitHub HTTP "
                             + exception.getStatusCode().value() + ")", exception);
 
         } catch (RestClientException exception) {
             throw new FileDownloadException(
-                    "Failed to download '" + path + "': " + exception.getMessage(), exception);
+                    "Failed to download '" + entry.path() + "': " + exception.getMessage(),
+                    exception);
         }
 
-        if (body == null) {
-            throw new FileDownloadException("GitHub returned no content for '" + path + "'");
+        if (blob == null) {
+            throw new FileDownloadException(
+                    "GitHub returned no content for '" + entry.path() + "'");
+        }
+
+        String encoding = blob.path("encoding").asText();
+        String content = blob.path("content").asText();
+
+        if (!"base64".equalsIgnoreCase(encoding) || content.isBlank()) {
+            throw new FileDownloadException(
+                    "GitHub returned an unsupported or empty blob for '" + entry.path() + "'");
+        }
+
+        final byte[] body;
+        try {
+            body = Base64.getMimeDecoder().decode(content);
+        } catch (IllegalArgumentException exception) {
+            throw new FileDownloadException(
+                    "GitHub returned invalid Base64 content for '" + entry.path() + "'",
+                    exception);
         }
 
         if (body.length > maxFileSizeBytes) {
             throw new FileDownloadException(
-                    "'" + path + "' is " + body.length + " bytes, above the limit of "
+                    "'" + entry.path() + "' is " + body.length + " bytes, above the limit of "
                             + maxFileSizeBytes);
         }
 

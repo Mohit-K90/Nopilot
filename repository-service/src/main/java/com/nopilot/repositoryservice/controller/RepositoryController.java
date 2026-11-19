@@ -2,6 +2,7 @@ package com.nopilot.repositoryservice.controller;
 
 import com.nopilot.repositoryservice.dto.request.CreateRepositoryRequest;
 import com.nopilot.repositoryservice.dto.response.CreateRepositoryResponse;
+import com.nopilot.repositoryservice.dto.response.RepositoryFileContentResponse;
 import com.nopilot.repositoryservice.dto.response.RepositoryFilesResponse;
 import com.nopilot.repositoryservice.dto.response.RepositoryResponse;
 import com.nopilot.repositoryservice.entity.Repository;
@@ -75,6 +76,17 @@ public class RepositoryController {
             Authentication authentication) {
 
         return repositoryService.getRepositoryFiles(id, authentication.getName());
+    }
+
+    @GetMapping("/{id}/contents")
+    public List<RepositoryFileContentResponse> getRepositoryFileContents(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        return repositoryService.getRepositoryFileContents(
+                id,
+                authentication.getName()
+        );
     }
 
     /** Fetches the repository from GitHub, filters and downloads its files. Synchronous. */

@@ -51,13 +51,13 @@ class SourceFileFilterTest {
         SourceFileFilter limited = new SourceFileFilter(limits);
 
         SourceFileFilter.Selection selection = limited.select(List.of(
-                new TreeEntry("src/deep/er/Z.java", 500),
-                new TreeEntry("src/A.java", 500),
-                new TreeEntry("README.md", 100),
-                new TreeEntry("pom.xml", 200),
-                new TreeEntry("big.java", 5000),
-                new TreeEntry("empty.py", 0),
-                new TreeEntry("logo.png", 10)
+                new TreeEntry("src/deep/er/Z.java", 500, "test-sha"),
+                new TreeEntry("src/A.java", 500, "test-sha"),
+                new TreeEntry("README.md", 100, "test-sha"),
+                new TreeEntry("pom.xml", 200, "test-sha"),
+                new TreeEntry("big.java", 5000, "test-sha"),
+                new TreeEntry("empty.py", 0, "test-sha"),
+                new TreeEntry("logo.png", 10, "test-sha")
         ));
 
         assertThat(selection.files()).extracting(TreeEntry::path)

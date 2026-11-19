@@ -1,3 +1,82 @@
 spring:
   application:
     name: ai-service
+  datasource:
+    url: jdbc:postgresql://localhost:55432/nopilot_ai?options=-c%20TimeZone=Asia/Kolkata
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-init-sql: SET TIME ZONE 'Asia/Kolkata'
+  sql:
+    init:
+      mode: always
+      continue-on-error: false
+  ai:
+    model:
+      chat: ollama
+      embedding: ollama
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:qwen2.5:3b}
+          temperature: 0.1
+          num-predict: 700
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 768
+        distance-type: COSINE_DISTANCE
+        index-type: HNSW
+        table-name: nopilot_code_vectors
+        schema-validation: true
+        max-document-batch-size: 16
+
+server:
+  port: 8083
+
+jwt:
+  secret: ${JWT_SECRET}
+
+nopilot:
+  ai:
+    repository-service:
+      base-url: http://localhost:8082
+      connect-timeout-seconds: 5
+      read-timeout-seconds: 60
+    ingestion:
+      max-file-bytes: 102400
+      embedding-batch-size: 16
+      worker-threads: 1
+      queue-capacity: 10
+    chunking:
+      max-chars: 1500
+      overlap-lines: 2
+      max-chunks-per-file: 300
+    retrieval:
+      default-limit: 5
+      max-limit: 20
+      similarity-threshold: 0.30
+      snippet-chars: 400
+    chat:
+      retrieval-top-k: 8
+      max-chunks-in-prompt: 5
+      max-chunks-per-file: 2
+      max-context-chars: 5000
+      temperature: 0.1
+      max-output-tokens: 512
+      max-question-chars: 1000
+    guide:
+      max-context-chars: 5000
+      max-output-tokens: 700
+      max-files-listed: 40
+      max-dependencies: 30
+logging:
+  level:
+    com.nopilot.aiservice: DEBUG
+    org.springframework.web.client: DEBUG
+    org.springframework.web: DEBUG

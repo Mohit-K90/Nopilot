@@ -27,4 +27,5 @@ public interface RepositoryFileRepository extends JpaRepository<RepositoryFile, 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from RepositoryFile f where f.repositoryId = :repositoryId")
     int deleteAllForRepository(@Param("repositoryId") UUID repositoryId);
+    List<RepositoryFile> findAllByRepositoryIdOrderByPathAsc(UUID repositoryId);
 }

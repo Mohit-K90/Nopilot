@@ -27,8 +27,7 @@ jwt:
 nopilot:
   github:
     base-url: https://api.github.com
-    raw-base-url: https://raw.githubusercontent.com
-    # Optional. Without a token GitHub allows only 60 API requests/hour per IP.
+    # Optional. A token increases the GitHub REST API rate limit.
     token: ${GITHUB_TOKEN:}
     connect-timeout-seconds: 5
     read-timeout-seconds: 20

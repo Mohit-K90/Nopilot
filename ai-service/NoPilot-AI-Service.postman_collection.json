@@ -1,0 +1,70 @@
+{
+  "info": {
+    "name": "NoPilot AI Service",
+    "description": "AI indexing, repository-scoped RAG chat, status and onboarding guide.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8083"},
+    {"key": "token", "value": ""},
+    {"key": "repositoryId", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "1. Index repository",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/ai/repositories/{{repositoryId}}/ingest"
+      }
+    },
+    {
+      "name": "2. Check index status",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/ai/repositories/{{repositoryId}}/status"
+      }
+    },
+    {
+      "name": "3. Ask a codebase question",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{token}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"Where is the application entry point and how does startup work?\"\n}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "url": "{{baseUrl}}/api/ai/repositories/{{repositoryId}}/chat"
+      }
+    },
+    {
+      "name": "4. Generate onboarding guide",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/ai/repositories/{{repositoryId}}/guide"
+      }
+    },
+    {
+      "name": "5. Reject code-writing request",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{token}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"Implement a new authentication controller\"\n}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "url": "{{baseUrl}}/api/ai/repositories/{{repositoryId}}/chat"
+      }
+    }
+  ]
+}

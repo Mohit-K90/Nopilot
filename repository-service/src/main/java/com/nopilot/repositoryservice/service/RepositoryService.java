@@ -1,6 +1,7 @@
 package com.nopilot.repositoryservice.service;
 
 import com.nopilot.repositoryservice.dto.request.CreateRepositoryRequest;
+import com.nopilot.repositoryservice.dto.response.RepositoryFileContentResponse;
 import com.nopilot.repositoryservice.dto.response.RepositoryFileResponse;
 import com.nopilot.repositoryservice.dto.response.RepositoryFilesResponse;
 import com.nopilot.repositoryservice.dto.response.RepositoryResponse;
@@ -73,6 +74,30 @@ public class RepositoryService {
     @Transactional(readOnly = true)
     public RepositoryResponse getRepository(UUID id, String userEmail) {
         return RepositoryResponse.from(getOwnedRepository(id, userEmail));
+    }
+
+    @Transactional(readOnly = true)
+    public List<RepositoryFileContentResponse> getRepositoryFileContents(
+            UUID id,
+            String userEmail
+    ) {
+        Repository repository = getOwnedRepository(id, userEmail);
+
+        if (repository.getStatus() != RepositoryStatus.READY) {
+            throw new RepositoryStateException(
+                    "Repository must be READY before file contents can be retrieved."
+            );
+        }
+
+        return fileRepository.findAllByRepositoryIdOrderByPathAsc(id)
+                .stream()
+                .map(file -> new RepositoryFileContentResponse(
+                        id,
+                        file.getPath(),
+                        file.getLanguage(),
+                        file.getContent()
+                ))
+                .toList();
     }
 
     /** File list (no contents). Only meaningful once the repository is READY. */
