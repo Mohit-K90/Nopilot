@@ -1,0 +1,106 @@
+import { useMemo, useState } from 'react';
+import { generateGuide } from '../api/ai';
+import { isAbort } from '../api/http';
+import type { GuideFacts } from '../api/types';
+import { Markdown, headingsOf } from '../components/Markdown';
+import { Button, EmptyState, ErrorNotice, Panel, useElapsed } from '../components/ui';
+import { Link } from '../router/Router';
+import { formatDate, formatDuration } from '../utils/format';
+import { loadGuide, saveGuide, type StoredGuide } from '../utils/stores';
+import { useRepo } from './RepoContext';
+
+const SECTIONS: [keyof GuideFacts, string][] = [
+  ['technologies', 'Technology stack'], ['languages', 'Languages'], ['entryPoints', 'Entry points'],
+  ['howToRun', 'How to run'], ['dependencies', 'Dependencies'], ['importantFiles', 'Important files'], ['folderStructure', 'Folder structure'],
+];
+
+function exportMarkdown(name: string, guide: StoredGuide) {
+  const list = (items: string[]) => (items.length ? items.map((i) => `- ${i}`).join('\n') : '- none detected');
+  const facts = SECTIONS.map(([key, title]) => `## ${title}\n\n${list(guide.facts[key])}`).join('\n\n');
+  const text = `# ${name} — onboarding guide\n\n_Generated ${guide.generatedAt} by NoPilot_\n\n${facts}\n\n---\n\n${guide.guide}\n`;
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));
+  const link = Object.assign(document.createElement('a'), { href: url, download: `${name}-guide.md` });
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export function GuidePage() {
+  const { repo, ai, busy, runAi } = useRepo();
+  const [guide, setGuide] = useState<StoredGuide | null>(() => loadGuide(repo.id));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const elapsed = useElapsed(loading);
+  const ready = ai?.status === 'READY';
+  const toc = useMemo(() => (guide ? headingsOf(guide.guide) : []), [guide]);
+
+  const generate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await generateGuide(repo.id);
+      const stored: StoredGuide = { guide: result.guide, facts: result.facts, generatedAt: new Date().toISOString() };
+      saveGuide(repo.id, stored);
+      setGuide(stored);
+    } catch (e) {
+      if (!isAbort(e)) setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const action = (
+    <Button variant={guide ? 'default' : 'primary'} icon="book" busy={loading} disabled={!ready} onClick={generate}>
+      {guide ? 'Regenerate guide' : 'Generate guide'}
+    </Button>
+  );
+
+  if (!ready && !guide) {
+    return (
+      <EmptyState title="The guide needs the AI index"
+        action={repo.status === 'READY'
+          ? <Button variant="primary" icon="chip" busy={busy === 'ai'} onClick={runAi}>Build AI index</Button>
+          : <Link className="btn" to={`/repositories/${repo.id}`}>Fetch the repository first</Link>}>
+        The onboarding guide is generated from the AI index of this repository.</EmptyState>
+    );
+  }
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h2>Onboarding guide</h2>
+          <p>{guide ? `Generated ${formatDate(guide.generatedAt)}. Saved in this browser; regenerating runs the local model again.` : 'Not generated yet. Generation runs the local model and can take a minute or more.'}</p>
+        </div>
+        <div className="row">
+          {guide && <Button icon="download" onClick={() => exportMarkdown(repo.repoName, guide)}>Export .md</Button>}
+          {action}
+        </div>
+      </div>
+      {loading && <div style={{ marginBottom: 16 }} role="status"><div className="label" style={{ marginBottom: 6 }}>Generating guide · {formatDuration(elapsed)}</div><div className="bar" /></div>}
+      {error && <div style={{ marginBottom: 16 }}><ErrorNotice title="Guide generation failed" message={error} onRetry={generate} /></div>}
+      {!guide ? (
+        !loading && <EmptyState title="No guide yet">Press “Generate guide” to produce purpose, execution flow and component notes grounded in the indexed code.</EmptyState>
+      ) : (
+        <div className="guide">
+          <Panel title="Guide"><Markdown text={guide.guide} /></Panel>
+          <div className="stack">
+            {toc.length > 0 && (
+              <Panel title="Contents">
+                <ul className="toc">{toc.map((h) => <li key={h.id} className={`l${h.depth}`}><a href={`#${h.id}`}>{h.text}</a></li>)}</ul>
+              </Panel>
+            )}
+            <Panel title="Repository facts">
+              <div className="facts">
+                {SECTIONS.map(([key, title]) => (
+                  <div key={key}><h3>{title}</h3>
+                    <ul>{guide.facts[key].length ? guide.facts[key].map((v) => <li key={v}>{v}</li>) : <li>none detected</li>}</ul></div>
+                ))}
+              </div>
+              <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>Facts are read from repository files, not generated by the model.</p>
+            </Panel>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
